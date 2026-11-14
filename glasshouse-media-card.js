@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Media Card v1.0.0
+ * Glasshouse Media Card v1.0.1
  * A premium now-playing card: artwork glow, live progress, transport, volume, speaker switching
  * and grouping. Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
   const TAG = 'glasshouse-media-card';
 
   const HOLD_MS = 500;
@@ -792,7 +792,8 @@
       $.idle = h('div', { class: 'idle' }, [$.idleBox, h('div', { class: 'idle-txt' }, [$.idleT, $.idleS]), $.pwr]);
 
       // speakers + group
-      $.chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Speakers' });
+      // ha-scrollbar: hass-swipe-navigation leaves horizontally scrollable .ha-scrollbar elements alone
+      $.chips = h('div', { class: 'chips ha-scrollbar', role: 'group', 'aria-label': 'Speakers' });
       $.spkN = h('span', { class: 'n' });
       $.speakers = h('div', { class: 'section' }, [h('div', { class: 'section-h' }, [h('span', { text: 'Speakers' }), $.spkN]), $.chips]);
       $.groups = h('div', { class: 'groups', role: 'group', 'aria-label': 'Group speakers' });
