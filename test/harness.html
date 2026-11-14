@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glasshouse Media Card harness</title>
+<!--
+  Offline test harness. Open directly (file://) in a browser.
+  ?layout=phone&scene=playing   one card at phone width (scenes: playing, paused, idle, grouped, tv, radio)
+  ?layout=desktop&scene=grouped a wide card plus a row of section-width cards
+  ?preview                      the composition used for docs/preview.png
+  default                       every scene, phone column + wide column
+  Stubs for ha-card / ha-icon / ha-state-icon and a mock hass (mock-hass.js) stand in for Home Assistant.
+  Album covers are painted on a canvas at load (generic generated art, no real releases).
+-->
+<style>
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    color: #e9eef6;
+    font-family: -apple-system, "SF Pro Text", Inter, Roboto, system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 700px at 12% -10%, rgba(88,166,255,0.16), transparent 60%),
+      radial-gradient(900px 600px at 95% 5%, rgba(196,140,255,0.12), transparent 60%),
+      radial-gradient(1000px 800px at 50% 120%, rgba(77,214,232,0.08), transparent 60%),
+      linear-gradient(180deg, #070b13 0%, #0a1020 55%, #070b13 100%) fixed;
+  }
+  .page { display: flex; gap: 28px; padding: 20px; align-items: flex-start; }
+  .phone { flex: 0 0 390px; width: 390px; display: flex; flex-direction: column; gap: 14px;
+    padding: 8px; box-sizing: border-box; }
+  .wide { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+  .row.two { grid-template-columns: 1fr 1fr; }
+  h6 { margin: 4px 0 0; font: 600 11px/1 system-ui; letter-spacing: .09em; text-transform: uppercase; color: #5d697d; }
+  #log { font: 11px/1.4 ui-monospace, monospace; color: #5d697d; white-space: pre-wrap; padding: 0 20px; }
+  body.l-phone .page { display: block; padding: 16px; width: 390px; box-sizing: border-box; }
+  body.l-phone .phone { width: auto; padding: 0; }
+  body.l-desktop .page { padding: 24px; }
+  body.preview .page { gap: 20px; padding: 28px; }
+</style>
+<script src="icons.js" onerror="window.GH_TEST_ICONS = {}"></script>
+<script>
+  // ---- minimal Home Assistant element stubs ----
+  customElements.define('ha-card', class extends HTMLElement {});
+  function svgFor(name) {
+    const d = (window.GH_TEST_ICONS || {})[name];
+    if (!d) {
+      const label = String(name || '?').replace('mdi:', '').slice(0, 2).toUpperCase();
+      return `<span style="font:700 9px system-ui;letter-spacing:-.02em">${label}</span>`;
+    }
+    return `<svg viewBox="0 0 24 24" width="100%" height="100%" style="display:block;fill:currentColor"><path d="${d}"></path></svg>`;
+  }
+  class StubIcon extends HTMLElement {
+    static get observedAttributes() { return ['icon']; }
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' }).innerHTML =
+        '<style>:host{display:inline-flex;width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px);align-items:center;justify-content:center;vertical-align:middle}</style><span style="display:contents"></span>';
+    }
+    set icon(v) { this._icon = v; this._render(); }
+    get icon() { return this._icon; }
+    attributeChangedCallback(n, o, v) { this._icon = v; this._render(); }
+    _render() { this.shadowRoot.querySelector('span').innerHTML = svgFor(this._icon); }
+  }
+  customElements.define('ha-icon', StubIcon);
+  customElements.define('ha-state-icon', class extends StubIcon {
+    set stateObj(st) {
+      this._st = st;
+      const tv = st && /tv/.test(st.entity_id);
+      this._icon = !st ? 'mdi:alert-circle-outline' : tv ? 'mdi:television' : 'mdi:speaker';
+      this._render();
+    }
+    get stateObj() { return this._st; }
+    set hass(h) { this._hass = h; }
+  });
+
+  // ---- generated album covers (canvas -> PNG data URLs) ----
+  function cover(paint) {
+    const c = document.createElement('canvas'); c.width = c.height = 600;
+    const x = c.getContext('2d'); paint(x, 600);
+    // film grain
+    const img = x.getImageData(0, 0, 600, 600), d = img.data;
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < d.length; i += 4) { const n = (rnd() - 0.5) * 18; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    x.putImageData(img, 0, 0);
+    return c.toDataURL('image/jpeg', 0.9);
+  }
+  function blob(x, cx, cy, r, col) {
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 600, 600);
+  }
+  const ART = {
+    sunset: cover((x, s) => {
+      const g = x.createLinearGradient(0, 0, 0, s);
+      g.addColorStop(0, '#2b0f3a'); g.addColorStop(0.45, '#c2410c'); g.addColorStop(0.62, '#fb923c'); g.addColorStop(1, '#3b0a2a');
+      x.fillStyle = g; x.fillRect(0, 0, s, s);
+      blob(x, 300, 330, 260, 'rgba(255,190,90,0.55)');
+      x.fillStyle = '#ffd68a'; x.beginPath(); x.arc(300, 340, 118, Math.PI, 0); x.fill();
+      x.fillStyle = 'rgba(40,8,30,0.9)';
+      for (let i = 0; i < 7; i++) x.fillRect(150, 300 + i * 18 + i * i * 1.2, 300, 6 + i);
+      x.fillStyle = '#1a0614'; x.fillRect(0, 410, s, s - 410);
+      x.strokeStyle = 'rgba(255,170,90,0.35)'; x.lineWidth = 2;
+      for (let i = 0; i < 9; i++) { x.beginPath(); x.moveTo(300, 410); x.lineTo(-200 + i * 125, 600); x.stroke(); }
+      x.fillStyle = 'rgba(255,230,200,0.92)'; x.font = '700 30px Helvetica, Arial'; x.letterSpacing = '8px';
+      x.fillText('COASTLINE FM', 40, 70);
+    }),
+    ocean: cover((x, s) => {
+      const g = x.createLinearGradient(0, 0, s, s);
+      g.addColorStop(0, '#04263f'); g.addColorStop(1, '#0e7490'); x.fillStyle = g; x.fillRect(0, 0, s, s);
+      blob(x, 420, 160, 300, 'rgba(45,212,191,0.55)');
+      blob(x, 120, 480, 260, 'rgba(56,189,248,0.4)');
+      for (let k = 0; k < 9; k++) {
+        x.strokeStyle = `rgba(190,245,255,${0.18 + k * 0.06})`; x.lineWidth = 3 + k * 0.6;
+        x.beginPath();
+        for (let i = 0; i <= 600; i += 10) x.lineTo(i, 300 + k * 26 + Math.sin(i / 60 + k * 0.7) * (18 + k * 2));
+        x.stroke();
+      }
+      x.fillStyle = 'rgba(220,250,255,0.9)'; x.font = 'italic 600 44px Georgia, serif'; x.fillText('Tidal Lines', 40, 92);
+    }),
+    forest: cover((x, s) => {
+      x.fillStyle = '#0f2a1d'; x.fillRect(0, 0, s, s);
+      blob(x, 300, 300, 330, 'rgba(74,222,128,0.45)');
+      for (let r = 280; r > 10; r -= 22) {
+        x.strokeStyle = `hsla(${110 + r / 8}, 70%, ${45 + (280 - r) / 12}%, 0.85)`; x.lineWidth = 9;
+        x.beginPath(); x.arc(300, 300, r, 0, Math.PI * 2); x.stroke();
+      }
+      x.fillStyle = '#eaffc2'; x.beginPath(); x.arc(300, 300, 26, 0, Math.PI * 2); x.fill();
+    }),
+    dusk: cover((x, s) => {
+      const g = x.createLinearGradient(0, 0, s, s);
+      g.addColorStop(0, '#1e1b4b'); g.addColorStop(1, '#831843'); x.fillStyle = g; x.fillRect(0, 0, s, s);
+      blob(x, 200, 200, 280, 'rgba(236,72,153,0.6)');
+      blob(x, 450, 420, 240, 'rgba(129,140,248,0.6)');
+      x.strokeStyle = 'rgba(255,200,240,0.85)'; x.lineWidth = 4;
+      for (let i = 0; i < 12; i++) { x.strokeRect(120 + i * 10, 120 + i * 10, 360 - i * 20, 360 - i * 20); }
+    }),
+  };
+</script>
+<script src="mock-hass.js"></script>
+<script src="../glasshouse-media-card.js"></script>
+</head>
+<body>
+<div class="page">
+  <div class="phone" id="phone"></div>
+  <div class="wide" id="wide"></div>
+</div>
+<pre id="log"></pre>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const preview = q.has('preview');
+  const layout = preview ? 'preview' : (q.get('layout') || 'all');
+  const scene = q.get('scene') || 'playing';
+  document.body.classList.add(preview ? 'preview' : `l-${layout}`);
+  const mock = GHMock.createHass(undefined, { art: ART });
+  window.mock = mock;
+
+  const P = {
+    lr: { entity: 'media_player.living_room', name: 'Living Room', icon: 'mdi:sofa' },
+    kitchen: { entity: 'media_player.kitchen', name: 'Kitchen', icon: 'mdi:silverware-fork-knife' },
+    office: { entity: 'media_player.office', name: 'Office', icon: 'mdi:desk' },
+    bedroom: { entity: 'media_player.bedroom', name: 'Bedroom', icon: 'mdi:bed-outline' },
+    patio: { entity: 'media_player.patio', name: 'Patio', icon: 'mdi:flower' },
+    tv: { entity: 'media_player.den_tv' },
+    radio: { entity: 'media_player.radio', name: 'Garage', icon: 'mdi:radio' },
+    porch: { entity: 'media_player.porch', name: 'Porch', icon: 'mdi:outdoor-lamp' },
+  };
+  const SCENES = {
+    playing: { players: [P.lr, P.office, P.bedroom, P.patio], show_group: false },
+    grouped: { players: [P.lr, P.kitchen, P.office, P.bedroom, P.patio] },
+    paused: { players: [P.office, P.lr, P.patio], default: 'media_player.office' },
+    idle: { players: [P.bedroom, P.patio, P.office], default: 'media_player.bedroom' },
+    tv: { players: [P.tv] },
+    radio: { players: [P.radio, P.porch, P.patio] },
+  };
+
+  const cards = [];
+  function add(parent, sceneName, label) {
+    const box = document.createElement('div');
+    box.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:0';
+    if (label) { const l = document.createElement('h6'); l.textContent = label; box.append(l); }
+    const el = document.createElement('glasshouse-media-card');
+    el.setConfig({ type: 'custom:glasshouse-media-card', ...SCENES[sceneName] });
+    box.append(el);
+    parent.append(box);
+    cards.push(el);
+    return el;
+  }
+  function row(parent, cls) { const r = document.createElement('div'); r.className = 'row ' + (cls || ''); parent.append(r); return r; }
+
+  const phone = document.getElementById('phone');
+  const wide = document.getElementById('wide');
+  if (layout === 'phone') {
+    wide.remove();
+    add(phone, scene);
+    if (q.has('stack')) q.get('stack').split(',').forEach((s) => add(phone, s));
+  } else if (layout === 'desktop') {
+    phone.remove();
+    add(wide, scene);
+    const r = row(wide);
+    (q.get('row') || 'paused,idle,tv').split(',').forEach((s) => add(r, s));
+  } else if (layout === 'preview') {
+    phone.remove();
+    add(wide, 'grouped');
+    const r = row(wide);
+    add(r, 'paused'); add(r, 'tv');
+    const col = document.createElement('div'); col.style.cssText = 'display:flex;flex-direction:column;gap:16px'; r.append(col);
+    add(col, 'idle'); add(col, 'radio');
+  } else {
+    Object.keys(SCENES).forEach((s) => add(phone, s, `phone · ${s}`));
+    add(wide, 'grouped', 'wide · grouped');
+    const r = row(wide, 'two');
+    add(r, 'playing', 'section · playing'); add(r, 'idle', 'section · idle');
+  }
+
+  mock.subscribe((hass) => cards.forEach((el) => { el.hass = hass; }));
+
+  const log = document.getElementById('log');
+  if (layout === 'all') {
+    document.addEventListener('hass-more-info', (e) => { log.textContent += `more-info ${e.detail.entityId}\n`; });
+    setInterval(() => {
+      log.textContent = mock.calls.slice(-8).map((c) => `${c.domain}.${c.service} ${JSON.stringify(c.data)}`).join('\n');
+    }, 500);
+  } else {
+    log.remove();
+  }
+})();
+</script>
+</body>
+</html>
