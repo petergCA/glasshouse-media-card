@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.0.1';
+  const VERSION = '1.1.0';
   const TAG = 'glasshouse-media-card';
 
   const HOLD_MS = 500;
@@ -529,6 +529,8 @@
       this._config = {
         ...config, players, default: def,
         show_volume: config.show_volume !== false, show_group: config.show_group !== false,
+        ignore_sources: (Array.isArray(config.ignore_sources) ? config.ignore_sources : config.ignore_sources ? [config.ignore_sources] : [])
+          .map((x) => String(x).toLowerCase()),
       };
       this._built = false;
       this._seen.clear();
@@ -596,8 +598,14 @@
       return [...ids];
     }
 
+    /** ignore_sources: a player on one of these inputs (e.g. a soundbar's "TV") doesn't count as playing music. */
+    _ignored(st) {
+      const list = this._config.ignore_sources;
+      return !!(st && list.length && st.attributes && list.includes(String(st.attributes.source || '').toLowerCase()));
+    }
+
     _hasMedia(st) {
-      if (!st) return false;
+      if (!st || this._ignored(st)) return false;
       if (ACTIVE_STATES.has(st.state)) return true;
       return ['on', 'idle'].includes(st.state) && !!st.attributes.media_title;
     }
@@ -611,7 +619,7 @@
       let best = null, bestT = -Infinity;
       for (const p of this._config.players) {
         const st = this._stateOf(p.entity);
-        if (!st || st.state !== 'playing') continue;
+        if (!st || st.state !== 'playing' || this._ignored(st)) continue;
         const t = Date.parse(st.last_changed) || 0;
         if (t > bestT) { bestT = t; best = p.entity; }
       }

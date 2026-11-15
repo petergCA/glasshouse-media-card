@@ -64,6 +64,7 @@ For the full look, pair it with the **Glasshouse** theme.
 | `default` | `auto` or entity | `auto` | Which player is active first. `auto` = the most recently changed playing player, else the first one. In `auto` mode the card also moves to a player that starts playing while the active one has nothing on, until you pick a speaker yourself. |
 | `show_volume` | boolean | `true` | Show the volume slider and mute button. |
 | `show_group` | boolean | `true` | Show grouping toggles when the active player has a `group_members` attribute. |
+| `ignore_sources` | list | `[]` | Inputs that don't count as music, e.g. `[TV]` for a Sonos soundbar on its TV input: such a player is treated as idle and auto mode won't pick it. |
 
 A single player can also be given as `entity: media_player.x` instead of `players`.
 

@@ -271,6 +271,17 @@ function setup(config, opts) {
   }
   {
     const { w } = setup();
+    const states = w.GHMock.demoStates();
+    states['media_player.living_room'].attributes.source = 'TV';
+    const mock = w.GHMock.createHass(states);
+    const card = w.document.createElement('glasshouse-media-card');
+    card.setConfig({ players: [P.lr], ignore_sources: ['TV'] });
+    w.document.body.append(card);
+    card.hass = { ...mock.current };
+    ok(!card._hasMedia(states['media_player.living_room']) && card._mostRecentPlaying() === null, 'ignore_sources: a soundbar on its TV input is not music');
+  }
+  {
+    const { w } = setup();
     const { dominantColor } = w.customElements.get('glasshouse-media-card')._internals;
     const px = (rgb, n) => { const a = []; for (let i = 0; i < n; i++) a.push(...rgb, 255); return a; };
     const c = dominantColor([...px([230, 110, 30], 300), ...px([20, 20, 30], 200)]);
