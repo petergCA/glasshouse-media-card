@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const TAG = 'glasshouse-media-card';
 
   const HOLD_MS = 500;
@@ -974,7 +974,7 @@
       for (const [eid, chip] of this._chips) {
         const st = this._stateOf(eid);
         const p = chip._parts;
-        const playing = !!st && st.state === 'playing';
+        const playing = !!st && st.state === 'playing' && !this._ignored(st); // a soundbar on its TV input isn't "playing" here
         if (playing) playingN += 1;
         setText(p.nm, this._nameOf(eid));
         if (p.ic.tagName === 'HA-STATE-ICON') { p.ic.hass = this._hass; p.ic.stateObj = st; }
@@ -982,7 +982,7 @@
         chip.classList.toggle('unavail', !st || st.state === 'unavailable');
         p.badge.hidden = !(!st || st.state === 'unavailable');
         p.eq.classList.toggle('on', playing);
-        p.eq.hidden = !playing && !(st && st.state === 'paused');
+        p.eq.hidden = !playing && !(st && st.state === 'paused' && !this._ignored(st));
         p.lnk.hidden = !(eid !== this._active && members.includes(eid) && members.length > 1);
         setAttr(chip, 'aria-pressed', String(eid === this._active));
         const stText = !st ? 'not found' : st.state;
